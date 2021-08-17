@@ -5,7 +5,7 @@ public extension NSObject {
     
      enum AccessibilityRole {
         case container(Array<AccessibilityRole>)
-        case element(AccessibilityRepresentation)
+        case element(Accessible)
         case none
     }
     
@@ -16,14 +16,14 @@ public extension NSObject {
             if let identifiable = self as? UIAccessibilityIdentification {
                 identifier = identifiable.accessibilityIdentifier
             }
-            return .element(.init(
+            return .element(AccessibilityRepresentation(
                 label: accessibilityLabel,
                 value: accessibilityValue,
                 hint: accessibilityHint,
                 identifier: identifier,
                 traits: accessibilityTraits.blueprintTraits))
-        case false:
             
+        case false:
             if let elements = accessibilityElements {
                 return .container(elements.compactMap({ any in
                     guard let obj = any as? NSObject else { return nil }
@@ -34,42 +34,85 @@ public extension NSObject {
             }
         }
     }
-
+    
+    func apply(accessibility: Accessible) {
+        if let label = accessibility.label {
+            accessibilityLabel = label
+        }
+        
+        if let value = accessibility.value {
+            accessibilityValue = value
+        }
+        
+        if let hint = accessibility.hint {
+            accessibilityHint = hint
+        }
+        
+        if let identifier = accessibility.identifier {
+            if let identifiable = self as? UIAccessibilityIdentification {
+                identifiable.accessibilityIdentifier = identifier
+            }
+        }
+        
+        // Some UIKit controls have custom UIAccessibilityTraits, we don't want to stomp them when applying our traits so we'll pull them out first and then union them with ours.
+        if let traits = accessibility.traits {
+            let privateTraits = accessibilityTraits.subtracting(UIAccessibilityTraits(withSet: AccessibilityTrait.allTraits))
+            accessibilityTraits = privateTraits.union(.init(withSet: traits))
+        }
+        
+    }
 }
 
-public struct AccessibilityRepresentation: Equatable, Hashable {
-    public enum Trait: Hashable {
-        case button
-        case link
-        case header
-        case searchField
-        case image
-        case selected
-        case playsSound
-        case keyboardKey
-        case staticText
-        case summaryElement
-        case notEnabled
-        case updatesFrequently
-        case startsMediaSession
-        case adjustable
-        case allowsDirectInteraction
-        case causesPageTurn
-        case tabBar
+public enum AccessibilityTrait: Hashable {
+    case button
+    case link
+    case header
+    case searchField
+    case image
+    case selected
+    case playsSound
+    case keyboardKey
+    case staticText
+    case summaryElement
+    case notEnabled
+    case updatesFrequently
+    case startsMediaSession
+    case adjustable
+    case allowsDirectInteraction
+    case causesPageTurn
+    case tabBar
+    
+    static var allTraits: Set<AccessibilityTrait> {
+        return [.button, .link, .header, .searchField,
+                .image,.selected, .playsSound, .keyboardKey,
+                .staticText, .summaryElement, .notEnabled,
+                .updatesFrequently, .staticText, .adjustable,
+                .allowsDirectInteraction, .causesPageTurn, .tabBar]
     }
+}
 
+public protocol Accessible {
+    var label: String? { get set}
+    var value: String? { get set}
+    var hint: String? { get set}
+    var identifier: String? { get set}
+    var traits: Set<AccessibilityTrait>? { get set}
+}
+
+public struct AccessibilityRepresentation: Accessible, Equatable, Hashable {
+    
     public var label: String?
     public var value: String?
     public var hint: String?
     public var identifier: String?
-    public var traits: Set<Trait>
+    public var traits: Set<AccessibilityTrait>?
     
     public init(
         label: String? = nil,
         value: String? = nil,
         hint: String? = nil,
         identifier: String? = nil,
-        traits: Set<Trait> = []
+        traits: Set<AccessibilityTrait> = []
     ) {
         self.label = label
         self.value = value
@@ -96,7 +139,7 @@ public struct AccessibilityElement: Element {
     }
 
     private var accessibilityTraits: UIAccessibilityTraits {
-        return UIAccessibilityTraits(withSet: accessibility.traits)
+        return UIAccessibilityTraits(withSet: accessibility.traits ?? [])
     }
 
     public var content: ElementContent {
@@ -149,7 +192,7 @@ public extension Element {
         value: String? = nil,
         hint: String? = nil,
         identifier: String? = nil,
-        traits: Set<AccessibilityRepresentation.Trait> = [],
+        traits: Set<AccessibilityTrait> = [],
         accessibilityFrameSize: CGSize? = nil
     ) -> AccessibilityElement {
          AccessibilityElement(
@@ -167,7 +210,7 @@ public extension Element {
 
 public extension UIAccessibilityTraits {
     
-    init(withSet set:Set<AccessibilityRepresentation.Trait>) {
+    init(withSet set:Set<AccessibilityTrait>) {
          self.init(rawValue: UIAccessibilityTraits.none.rawValue)
              for trait in set {
                  switch trait {
@@ -209,8 +252,8 @@ public extension UIAccessibilityTraits {
              }
          }
     
-    var blueprintTraits: Set<AccessibilityRepresentation.Trait> {
-        var set:Set<AccessibilityRepresentation.Trait> = []
+    var blueprintTraits: Set<AccessibilityTrait> {
+        var set:Set<AccessibilityTrait> = []
         if self.contains(.button) {
             set.insert(.button)
         }
