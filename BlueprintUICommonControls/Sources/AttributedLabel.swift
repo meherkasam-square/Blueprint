@@ -265,6 +265,11 @@ extension AttributedLabel {
                 if previousAttributedText != attributedText {
                     links = attributedLinks(in: model.attributedText) + detectedDataLinks(in: model.attributedText)
                     accessibilityLinks = accessibilityLinks(for: links, in: model.attributedText)
+                    accessibilityLabel = accessibilityLabel(
+                        with: links,
+                        in: model.attributedText.string,
+                        linkAccessibilityLabel: environment.linkAccessibilityLabel
+                    )
                 }
 
                 if let shadow = model.shadow {
@@ -514,6 +519,32 @@ extension AttributedLabel {
                         link: link
                     )
                 }
+
+
+        }
+
+        private func accessibilityLabel(with links: [Link], in string: String, linkAccessibilityLabel: String?) -> String {
+            // Insert the word "link" after each link in the label. This mirrors the VoiceOver utterance of `SwiftUI.Text` when rendering a markdown link.
+            // Wrap the word in [brackets] to indicate that it is distinct from the content string.
+            guard let localizedLinkString = linkAccessibilityLabel,
+                  !links.isEmpty else { return string }
+            var label = string
+            let insertionString = "[\(localizedLinkString)] "
+            // Insert from the end of the string to keep indices stable.
+            let reversed = links.sorted { $0.range.location > $1.range.location }
+            for link in reversed {
+                let insertionPoint = label.index(label.startIndex, offsetBy: link.range.location + link.range.length)
+                let insertionEnd = label.index(
+                    insertionPoint,
+                    offsetBy: insertionString.count,
+                    limitedBy: label.endIndex
+                )
+                if insertionEnd != nil && label[insertionPoint...(insertionEnd ?? insertionPoint)] == insertionString {
+                    continue
+                }
+                label.insert(contentsOf: insertionString, at: insertionPoint)
+            }
+            return label
         }
 
         func applyLinkColors(activeLinks: [Link] = []) {
@@ -528,6 +559,20 @@ extension AttributedLabel {
             }
 
             attributedText = mutableString
+        }
+
+        override func accessibilityActivate() -> Bool {
+            /// No links: Not interactive, no effect.
+            guard links.isEmpty == false else {
+                return false
+            }
+            /// Exactly one link: Activate the link.
+            if links.count == 1, let url = links.first?.url {
+                urlHandler?.onTap(url: url)
+                return true
+            }
+            /// More than one link: Ambiguous selection, no effect, Select links using the rotor..
+            return false
         }
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -591,6 +636,7 @@ extension AttributedLabel {
             self.link = link
             super.init(accessibilityContainer: container)
             accessibilityLabel = label
+            accessibilityTraits = [.link]
         }
 
         override var accessibilityFrameInContainerSpace: CGRect {
