@@ -524,9 +524,11 @@ extension AttributedLabel {
         }
 
         private func accessibilityLabel(with links: [Link], in string: String, linkAccessibilityLabel: String?) -> String {
-            // When reading an attributed string that contains the `.link` attribute VoiceOver will announce "link" when it encounters the applied range. This is important because it informs the user about the context and position of the linked text within the greater string. This can be partocularly important when a string contains multiple links with the same linked text but different link destinationss.
+            // When reading an attributed string that contains the `.link` attribute VoiceOver will announce "link" when it encounters the applied range. This is important because it informs the user about the context and position of the linked text within the greater string. This can be partocularly important when a string contains multiple links with the same linked text but different link destinations.
 
             // UILabel is extremely insistant about how the `.link` attribute should be styled going so far as to apply its own preferences above any other provided attributes. In order to allow custom link styling we replace any instances of the `.link` attribute with a `labelLink.` attribute (see `NSAttributedString.normalizingForView(with:)`. This allows us to track the location of links while still providing our own custom styling. Unfortunately this means that voiceover doesnt recognize our links as links and consequently they are not announced to the user.
+
+            // Ideally we'd be able to enumerate our links, insert the `.link` attribute back and then set the resulting string as the `accessibilityAttributedString` but unfortunately that doesnt seem to work. Apple's [docs](https://developer.apple.com/documentation/objectivec/nsobject/2865944-accessibilityattributedlabel) indicate that this property is intended "for the inclusion of language attributes in the string to control pronunciation or accents" and doesnt seem to notice any included `.link` attributes.
 
             // Insert the word "link" after each link in the label. This mirrors the VoiceOver behavior when encountering a `.link` attribute.
 
