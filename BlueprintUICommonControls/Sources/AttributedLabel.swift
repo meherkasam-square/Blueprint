@@ -524,11 +524,16 @@ extension AttributedLabel {
         }
 
         private func accessibilityLabel(with links: [Link], in string: String, linkAccessibilityLabel: String?) -> String {
-            // Insert the word "link" after each link in the label. This mirrors the VoiceOver utterance of `SwiftUI.Text` when rendering a markdown link.
-            // Wrap the word in [brackets] to indicate that it is distinct from the content string.
+            // When reading an attributed string that contains the `.link` attribute VoiceOver will announce "link" when it encounters the applied range. This is important because it informs the user about the context and position of the linked text within the greater string. This can be partocularly important when a string contains multiple links with the same linked text but different link destinationss.
+
+            // UILabel is extremely insistant about how the `.link` attribute should be styled going so far as to apply its own preferences above any other provided attributes. In order to allow custom link styling we replace any instances of the `.link` attribute with a `labelLink.` attribute (see `NSAttributedString.normalizingForView(with:)`. This allows us to track the location of links while still providing our own custom styling. Unfortunately this means that voiceover doesnt recognize our links as links and consequently they are not announced to the user.
+
+            // Insert the word "link" after each link in the label. This mirrors the VoiceOver behavior when encountering a `.link` attribute.
+
             guard let localizedLinkString = linkAccessibilityLabel,
                   !links.isEmpty else { return string }
             var label = string
+            // Wrap the word in [brackets] to indicate that it is a tag distinct from the content string. This is transparent to voiceover but should be helpful when the accessibility label is printed e.g. in the accessibility inspector.
             let insertionString = "[\(localizedLinkString)] "
             // Insert from the end of the string to keep indices stable.
             let reversed = links.sorted { $0.range.location > $1.range.location }
