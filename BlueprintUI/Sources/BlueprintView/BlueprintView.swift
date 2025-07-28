@@ -40,6 +40,9 @@ public final class BlueprintView: UIView {
 
     private var sizesThatFit: [SizeConstraint: CGSize] = [:]
 
+    public var supportsAccessibilityLargeContentViewer: Bool = false
+    public private(set) var largeContentViewerInteraction: UILargeContentViewerInteraction?
+
     /// A base environment used when laying out and rendering the element tree.
     ///
     /// Some keys will be overridden with the traits from the view itself. Eg, `windowSize`, `safeAreaInsets`, etc.
@@ -333,6 +336,12 @@ public final class BlueprintView: UIView {
 
     public override func didMoveToWindow() {
         super.didMoveToWindow()
+        if supportsAccessibilityLargeContentViewer {
+            let largeContentViewerInteraction = UILargeContentViewerInteraction()
+            addInteraction(largeContentViewerInteraction)
+            self.largeContentViewerInteraction = largeContentViewerInteraction
+        }
+
         isVisible = (window != nil)
         setNeedsViewHierarchyUpdate()
     }
